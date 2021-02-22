@@ -2,6 +2,7 @@ package com.simibubi.create.content.contraptions.components.waterwheel;
 
 import com.simibubi.create.AllBlocks;
 import com.simibubi.create.AllFluids;
+import com.simibubi.create.AllShapes;
 import com.simibubi.create.AllTileEntities;
 import com.simibubi.create.content.contraptions.base.DirectionalKineticBlock;
 import com.simibubi.create.foundation.advancement.AllTriggers;
@@ -14,21 +15,32 @@ import com.simibubi.create.foundation.utility.worldWrappers.WrappedWorld;
 import net.minecraft.block.BlockRenderType;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
+import net.minecraft.block.Block;
 import net.minecraft.block.BubbleColumnBlock;
+import net.minecraft.block.IWaterLoggable;
+import net.minecraft.fluid.Fluids;
 import net.minecraft.fluid.IFluidState;
 import net.minecraft.item.BlockItemUseContext;
+import net.minecraft.state.BooleanProperty;
+import net.minecraft.state.StateContainer;
+import net.minecraft.state.properties.BlockStateProperties;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.Direction;
 import net.minecraft.util.Direction.Axis;
 import net.minecraft.util.Direction.AxisDirection;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.math.shapes.ISelectionContext;
+import net.minecraft.util.math.shapes.VoxelShape;
+import net.minecraft.util.math.shapes.VoxelShapes;
 import net.minecraft.world.IBlockReader;
 import net.minecraft.world.IWorld;
 import net.minecraft.world.IWorldReader;
 import net.minecraft.world.World;
 
-public class WaterWheelBlock extends DirectionalKineticBlock implements ITE<WaterWheelTileEntity> {
+public class WaterWheelBlock extends DirectionalKineticBlock implements ITE<WaterWheelTileEntity>, IWaterLoggable {
+
+	public static final BooleanProperty WATERLOGGED = BlockStateProperties.WATERLOGGED;
 
 	public WaterWheelBlock(Properties properties) {
 		super(properties);
@@ -37,6 +49,12 @@ public class WaterWheelBlock extends DirectionalKineticBlock implements ITE<Wate
 	@Override
 	public TileEntity createTileEntity(BlockState state, IBlockReader world) {
 		return AllTileEntities.WATER_WHEEL.create();
+	}
+
+	@Override
+	protected void fillStateContainer(StateContainer.Builder<Block, BlockState> builder) {
+		builder.add(WATERLOGGED);
+		super.fillStateContainer(builder);
 	}
 
 	@Override
@@ -68,6 +86,10 @@ public class WaterWheelBlock extends DirectionalKineticBlock implements ITE<Wate
 		World world = worldIn.getWorld();
 		if (world == null || worldIn instanceof WrappedWorld)
 			return stateIn;
+		if (stateIn.get(BlockStateProperties.WATERLOGGED)) {
+			world.getPendingFluidTicks()
+					.scheduleTick(currentPos, Fluids.WATER, Fluids.WATER.getTickRate(world));
+		}
 		updateFlowAt(stateIn, world, currentPos, facing);
 		updateWheelSpeed(worldIn, currentPos);
 		return stateIn;
@@ -154,13 +176,16 @@ public class WaterWheelBlock extends DirectionalKineticBlock implements ITE<Wate
 		BlockState placedOn = context.getWorld()
 			.getBlockState(context.getPos()
 				.offset(facing.getOpposite()));
+		IFluidState fluid = context.getWorld().getFluidState(context.getPos());
 		if (AllBlocks.WATER_WHEEL.has(placedOn))
-			return getDefaultState().with(FACING, placedOn.get(FACING));
+			return getDefaultState().with(FACING, placedOn.get(FACING))
+					.with(WATERLOGGED, fluid.getFluid() == Fluids.WATER);
 		if (facing.getAxis()
 			.isHorizontal())
 			return getDefaultState().with(FACING, context.getPlayer() != null && context.getPlayer()
-				.isSneaking() ? facing.getOpposite() : facing);
-		return super.getStateForPlacement(context);
+				.isSneaking() ? facing.getOpposite() : facing)
+					.with(WATERLOGGED, fluid.getFluid() == Fluids.WATER);
+		return super.getStateForPlacement(context).with(WATERLOGGED, fluid.getFluid() == Fluids.WATER);
 	}
 
 	@Override
@@ -173,6 +198,18 @@ public class WaterWheelBlock extends DirectionalKineticBlock implements ITE<Wate
 	public Axis getRotationAxis(BlockState state) {
 		return state.get(FACING)
 			.getAxis();
+	}
+
+	@Override
+	public IFluidState getFluidState(BlockState state) {
+		return state.get(BlockStateProperties.WATERLOGGED) ? Fluids.WATER.getStillFluidState(false)
+				: Fluids.EMPTY.getDefaultState();
+	}
+
+	@Override
+	public VoxelShape getShape(BlockState state, IBlockReader worldIn, BlockPos pos, ISelectionContext context) {
+		Axis axis = state.get(FACING).getAxis();
+		return AllShapes.WATER_WHEEL.get(axis);
 	}
 
 	@Override

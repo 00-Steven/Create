@@ -109,7 +109,8 @@ public class AllShapes {
 			.add(3, 12, 3, 13, 16, 13)
 			.forDirectional(Direction.UP),
 		CRUSHING_WHEEL_CONTROLLER_COLLISION = shape(0, 0, 0, 16, 13, 16)
-			.forDirectional(Direction.DOWN)
+			.forDirectional(Direction.DOWN),
+		WATER_WHEEL = shape(0, 0, 0, 16, 16, 16).erase(2, 0, 2, 14, 16, 14).add(5, 0, 5, 11, 16, 11).add(0, 2, 0, 16, 14, 16).forAxis()
 
 
 	;
